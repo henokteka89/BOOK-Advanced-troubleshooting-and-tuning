@@ -1,0 +1,102 @@
+-- Check Numa nodes
+SELECT
+parent_node_id
+,COUNT(*) as [Schedulers]
+,SUM(current_tasks_count) as [Current]
+,SUM(runnable_tasks_count) as [Runnable]
+FROM sys.dm_os_schedulers
+WHERE status = 'VISIBLE ONLINE'
+GROUP BY parent_node_id;
+
+--Error Log
+IF OBJECT_ID('tempdb..#Logs',N'U') IS NOT NULL DROP TABLE #Logs;
+IF OBJECT_ID('tempdb..#Errors',N'U') IS NOT NULL DROP TABLE
+#Errors;
+go
+CREATE TABLE #Errors
+(
+LogNum INT NULL,
+LogDate DATETIME NULL,
+ID INT NOT NULL identity(1,1),
+ProcessInfo VARCHAR(50) NULL,
+[Text] VARCHAR(MAX) NULL,
+PRIMARY KEY(ID)
+);
+CREATE TABLE #Logs
+(
+[LogDate] DATETIME NULL,
+ProcessInfo VARCHAR(50) NULL,
+[Text] VARCHAR(max) NULL
+);
+DECLARE
+@StartDate DATETIME = DATEADD(DAY,-7,GETDATE())
+,@EndDate DATETIME = GETDATE()
+,@NumErrorLogs INT = 1
+,@ExcludeLogonErrors BIT = 1
+,@ShowSurroundingEvents BIT = 1
+,@ExcludeLogonSurroundingEvents BIT = 1
+,@SurroundingEventsBeforeSecond INT = 5
+,@SurroundingEventsAfterSecond INT = 5 ,@LogNum INT = 0;
+DECLARE
+@ErrorsToIgnore TABLE
+(
+ErrorText NVARCHAR(1024) NOT NULL
+);
+INSERT INTO @ErrorsToIgnore(ErrorText)
+VALUES
+(N'Registry startup parameters:%'),
+(N'Logging SQL Server messages in file%'),
+(N'CHECKDB for database%finished without errors%');
+WHILE (@LogNum <= @NumErrorLogs)
+BEGIN
+INSERT INTO #Errors(LogDate,ProcessInfo,Text)
+EXEC [master].[dbo].[xp_readerrorlog]
+@LogNum, 1, N'error', NULL, @StartDate, @EndDate, N'desc';IF @@ROWCOUNT > 0
+UPDATE #Errors SET LogNum = @LogNum WHERE LogNum IS NULL;
+SET @LogNum += 1;
+END;
+IF @ExcludeLogonErrors = 1
+DELETE FROM #Errors WHERE ProcessInfo = 'Logon';
+DELETE FROM e
+FROM #Errors e
+WHERE EXISTS
+(
+SELECT *
+FROM @ErrorsToIgnore i
+WHERE e.Text LIKE i.ErrorText
+);
+-- Errors only
+SELECT * FROM #Errors ORDER BY LogDate DESC;
+IF @@ROWCOUNT > 0 AND @ShowSurroundingEvents = 1
+BEGIN
+DECLARE
+@LogDate DATETIME
+,@ID INT = 0
+WHILE 1 = 1
+BEGIN
+SELECT TOP 1 @LogNum = LogNum, @LogDate = LogDate, @ID = ID
+FROM #Errors
+WHERE ID > @ID
+ORDER BY ID;
+IF @@ROWCOUNT = 0
+BREAK;
+SELECT
+@StartDate = DATEADD(SECOND, -@SurroundingEventsBeforeSecond,
+@LogDate)
+,@EndDate = DATEADD(SECONd, @SurroundingEventsAfterSecond,
+@LogDate);
+INSERT INTO #Logs(LogDate,ProcessInfo,Text)
+EXEC [master].[dbo].[xp_readerrorlog]
+@LogNum, 1, NULL, NULL, @StartDate, @EndDate;
+END;
+IF @ExcludeLogonSurroundingEvents = 1DELETE FROM #Logs WHERE ProcessInfo = 'Logon';
+DELETE FROM e
+FROM #Logs e
+WHERE EXISTS
+(
+SELECT *
+FROM @ErrorsToIgnore i
+WHERE e.Text LIKE i.ErrorText
+);
+SELECT * FROM #Logs ORDER BY LogDate DESC;
+END
