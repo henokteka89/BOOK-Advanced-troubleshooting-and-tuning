@@ -1,3 +1,9 @@
+/*
+you can sort data by different criteria than average I/O. You can
+also add predicates to the WHERE and/or HAVING clauses of the query to
+narrow down the results.
+*/
+
 SELECT TOP 50
 q.query_id, qt.query_sql_text, qp.plan_id, qp.query_plan
 ,SUM(rs.count_executions) AS [Execution Cnt]
