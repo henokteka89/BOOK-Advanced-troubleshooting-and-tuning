@@ -1,0 +1,22 @@
+/*
+Find similar queries based on query_hash value. Usually, those queries belong to a non-parameterized ad-hoc
+workload in the system. You can parameterize those queries in the code. If
+that’s not possible, consider using forced parameterization
+*/
+
+SELECT TOP 100
+q.query_hash
+,COUNT(*) AS [Query Count]
+,AVG(rs.count_executions) AS [Avg Exec Count]
+FROM
+sys.query_store_query q WITH (NOLOCK)
+JOIN sys.query_store_plan qp WITH (NOLOCK) ON
+q.query_id = qp.query_id
+JOIN sys.query_store_runtime_stats rs WITH (NOLOCK) ON
+qp.plan_id = rs.plan_id
+GROUP BY
+q.query_hash
+HAVING COUNT(*) > 1
+ORDER BY
+[Avg Exec Count] ASC, [Query Count] DESC
+OPTION(MAXDOP 1, RECOMPILE);
