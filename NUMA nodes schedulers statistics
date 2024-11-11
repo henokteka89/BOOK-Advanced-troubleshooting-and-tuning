@@ -1,0 +1,15 @@
+/*
+You can use it to get information about schedulers’
+distribution across NUMA nodes and to analyze metrics from individual
+schedulers.
+*/
+
+
+SELECT
+parent_node_id
+,COUNT(*) as [Schedulers]
+,SUM(current_tasks_count) as [Current]
+,SUM(runnable_tasks_count) as [Runnable]
+FROM sys.dm_os_schedulers
+WHERE status = 'VISIBLE ONLINE'
+GROUP BY parent_node_id;
