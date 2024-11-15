@@ -1,0 +1,37 @@
+CREATE PROC dbo.SearchOrders
+(
+@StoreId INT
+,@CustomerId UNIQUEIDENTIFIER
+)
+AS
+SELECT OrderId, CustomerId, Amount, Fulfilled
+FROM dbo.Orders
+WHERE
+((@StoreId IS NULL) OR (StoreId = @StoreId)) AND
+((@CustomerId IS NULL) OR (CustomerId = @CustomerId));
+Go
+e.g. exec EXEC dbo.SearchOrders @StoreId = 99, @CustomerId = 'A65C047D-5B08-4041-B2FE-8E3DD6570B8A';
+
+
+-- Conversion to Dynamic
+ALTER PROC dbo.SearchOrders
+(
+@StoreId INT
+,@CustomerId UNIQUEIDENTIFIER
+)
+AS
+BEGIN
+DECLARE
+@SQL nvarchar(max) =
+N'SELECT OrderId, CustomerId, Amount, Fulfilled
+FROM dbo.Orders
+WHERE
+(1=1)' +
+IIF(@StoreId IS NOT NULL, N'AND (StoreId = @StoreId)','') +
+IIF(@CustomerId IS NOT NULL, N'AND (CustomerId =
+@CustomerId)','');
+EXEC sp_executesql
+@SQL = @SQL
+,@Params = N'@StoreId INT, @CustomerId UNIQUEIDENTIFIER'
+,@StoreId = @StoreId, @CustomerId = @CustomerId;
+END
