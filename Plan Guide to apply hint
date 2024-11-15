@@ -1,0 +1,17 @@
+DECLARE
+@stmt nvarchar(max)
+,@params nvarchar(max)
+,@query nvarchar(max) =
+N’SELECT TOP 1 OrderId FROM dbo.Orders WHERE CustomerId =
+‘’B970D68B-F88E-438B-9B04-6EDE47CC1D9A’’’;
+EXEC sp_get_query_template
+@querytext = @query
+,@templatetext = @stmt output
+,@params = @params output;
+EXEC sp_create_plan_guide
+@type = N’TEMPLATE’
+,@name = N’forced_parameterization_plan_guide’
+,@stmt = @stmt
+,@module_or_batch = null
+,@params = @params
+,@hints = N’OPTION (PARAMETERIZATION FORCED)’;
