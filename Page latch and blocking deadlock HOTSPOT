@@ -1,0 +1,41 @@
+--Detects indexes that contribute to hotspots. 
+
+SELECT
+s.name + '.' + t.name as [table]
+,i.index_id
+,i.name as [index]
+,SUM(os.page_latch_wait_count) AS [latch count]
+,SUM(os.page_latch_wait_in_ms) as [latch wait (ms)]
+FROM
+sys.indexes i WITH (NOLOCK) JOIN sys.tables t WITH (NOLOCK)
+on
+i.object_id = t.object_id
+JOIN sys.schemas s WITH (NOLOCK) ON
+t.schema_id = s.schema_id
+CROSS APPLY
+sys.dm_db_index_operational_stats
+(
+DB_ID()
+,t.object_id
+,i.index_id
+,0
+) os
+GROUP BY
+s.name, t.name, i.name, i.index_id
+ORDER BY
+SUM(os.page_latch_wait_in_ms) DESC;
+
+
+
+Addressing Hotspots:
+OPTIMIZE_FOR_SEQUENTIAL_KEY Index Option
+
+In SQL Server 2019 and above, you can enable the OPTIMIZE_FOR_SEQUENTIAL_KEY index property.
+This setting will improve throughput in hotspot scenarios, but will not solve the problem completely.
+e.g. 
+ALTER INDEX PK_WebRequestHeaders_Disk
+ON dbo.WebRequestHeaders_Disk
+SET (OPTIMIZE_FOR_SEQUENTIAL_KEY = ON);
+ALTER INDEX PK_WebRequestParams_Disk
+ON dbo.WebRequestParams_Disk
+SET (OPTIMIZE_FOR_SEQUENTIAL_KEY = ON);
