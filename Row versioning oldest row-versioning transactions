@@ -1,0 +1,49 @@
+-- Detecting the five oldest row-versioning transactions
+SELECT TOP 5
+at.transaction_id
+,at.elapsed_time_seconds
+,at.session_id
+,s.login_time
+,s.login_name
+,s.host_name
+,s.program_name
+,s.last_request_start_time
+,s.last_request_end_time,er.status
+,er.wait_type
+,er.wait_time
+,er.blocking_session_id
+,er.last_wait_type
+,st.text AS [SQL]
+FROM
+sys.dm_tran_active_snapshot_database_transactions at WITH
+(NOLOCK)
+JOIN sys.dm_exec_sessions s WITH (NOLOCK) on
+at.session_id = s.session_id
+LEFT JOIN sys.dm_exec_requests er WITH (NOLOCK) on
+at.session_id = er.session_id
+CROSS APPLY
+sys.dm_exec_sql_text(er.sql_handle) st
+ORDER BY
+at.elapsed_time_seconds DESC;
+
+NOTE
+Long-running transactions on readable secondaries in Availability Groups can defer
+version store clean-up. 
+
+There are several performance counters in the Transactions performance
+object that you can use to monitor version store behavior:
+Version Store Size (KB)
+Current size of the version store.
+
+Version Generation rate (KB/s)
+Growth rate of the version store.
+
+Version Cleanup rate (KB/s)
+Cleanup rate of the version store.
+
+Longest Transaction Running Time
+Duration in seconds of the oldest active transaction that is using row versioning.
+
+Free Space in tempdb (KB)
+Amount of available space in tempdb. While this counter is not related
+to the version store, you can use it for general tempdb monitoring.
